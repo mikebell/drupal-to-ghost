@@ -1,0 +1,208 @@
+<?php
+
+
+function ghost_menu() {
+	$items["admin/config/system/ghost"] = array(
+		'title' => 'Export content to Ghost',
+		'page callback' => 'drupal_get_form',
+		'page arguments' => array('ghost_export_page'),
+		'access arguments' => array("administer site configuration"),
+		'description' => 'Helps you export your content to a JSON file compatible with Ghost'
+	);
+
+	return $items;
+}
+
+function ghost_export_page($form) {
+	$types = array();
+	$content_types = node_type_get_types();
+	foreach($content_types as $type) {
+		$types[$type->type] = $type->name;
+	}
+
+	$vocabularies = array();
+	$vocabs = taxonomy_get_vocabularies();
+	foreach($vocabs as $vocab) {
+		$vocabularies[$vocab->vid] = $vocab->name;
+	}
+
+	$form["type"] = array(
+		'#type' => 'select',
+		'#title' => t("Content type to export"),
+		'#options' => $types,
+		'#required' => TRUE,
+		'#description' => t("Select from the list the content type you want to export")
+	);
+
+	$form["vid"] = array(
+		'#type' => 'select',
+		'#title' => t("Vobaculary to use with tags"),
+		'#options' => $vocabularies,
+		'#required' => TRUE,
+		'#description' => t("Select from the list the vocabulary to use if you want to export tags")
+	);
+
+	$form["submit"] = array(
+		'#type' => 'submit',
+		'#value' => t("Create file")
+	);
+
+	return $form;
+}
+
+function ghost_export_page_submit(&$form, &$form_state) {
+	$type = $form_state["values"]["type"];
+	$vid = $form_state["values"]["vid"];
+	$uid = 1;
+
+	$export = array(
+		'meta' => ghost_export_meta(),
+		'data' => array(
+			'posts' => ghost_export_nodes($type),
+			'tags' => ghost_export_tags(1),
+			'posts_tags' => ghost_export_post_tags($type),
+			'users' => array(),
+			"roles_users" => ghost_export_roles_users(),
+		)
+	);
+
+	$filedir = 'sites/default/files';
+	$filename = "export_" . time() . ".json";
+	$content = drupal_json_encode($export);
+	$handle = fopen( $filedir . '/' . $filename, 'w' );
+	fwrite( $handle, $content );
+	fclose( $handle );
+
+	header( 'Content-Description: File Transfer' );
+	header( 'Content-Type: application/octet-stream' );
+	header( 'Content-Disposition: attachment; filename='.$filename );
+	header( 'Content-Transfer-Encoding: binary' );
+	header( 'Expires: 0' );
+	header( 'Cache-Control: must-revalidate' );
+	header( 'Pragma: public' );
+	header( 'Content-Length: ' . filesize( $filedir . '/' . $filename ) );
+
+	flush();
+	readfile( $filedir . '/' . $filename );
+	exit;
+}
+
+function ghost_export_meta() {
+  $meta = array(
+  	'exported_on' => time()*1000,
+  	'version' => '003'
+  );
+
+  return $meta;
+}
+
+function ghost_export_tags($vid) {
+	$slugs = array();
+	$tags = array();
+	$terms = taxonomy_get_tree($vid);
+	foreach($terms as $term) {
+		$tagSlug = substr(strtolower(str_replace(" ", "", $term->name)), 0, 150);
+		if(!in_array($tagSlug, $slugs)) {
+			$tag = array(
+				"id" => intval($term->tid),
+				"name" => substr($term->name, 0, 150),
+				"slug" => $tagSlug,
+				"description" => ""
+			);
+
+			$tags[] = $tag;
+			$slugs[] = $tagSlug;
+		}
+	}
+
+	return $tags;
+}
+
+function ghost_export_user($uid) {
+	$users = array();
+	$user = user_load($uid);
+
+	$users[0] = array(
+		'id' => intval($user->uid),
+		'name' => $user->name,
+		'slug' => strtolower(str_replace(" ", "-", $user->name)),
+		'email' => $user->mail,
+		"image" => null,
+    "cover" => null,
+    "bio" => null,
+    "website" => null,
+    "location" => null,
+    "accessibility" => null,
+    "status" => "active",
+    "language" => "en_US",
+    "meta_title" => null,
+    "meta_description" => null,
+    "last_login" => null,
+    "created_at" => $user->created * 1000, // epoch time in millis
+    "created_by" => 1, // the first user created has an id of 1
+    "updated_at" =>  $user->created * 1000, // epoch time in millis
+    "updated_by" => 1 // the first user created has an id of 1
+	);
+
+	return $users;
+}
+
+function ghost_export_nodes($content_type) {
+	$exports = array();
+	// @todo remove this condition of 3
+	$nodes = node_load_multiple(array(), array("type" => check_plain($content_type)));
+	foreach($nodes as $node) {
+		$item = array(
+			"id" => intval($node->nid),
+			"title" => substr($node->title, 0, 150),
+			"slug" => substr(strtolower(str_replace(" ", "-", $node->title)), 0, 150),
+			"markdown" => isset($node->body["und"][0]["value"]) ? $node->body["und"][0]["value"] : $node->title,
+			"html" => isset($node->body["und"][0]["safe_value"]) ? str_replace("[", "<", str_replace("]", ">", $node->body["und"][0]["safe_value"])) : $node->title,
+			"image" => null,
+			"featured" => 0,
+			"page" => 0,
+			'status' => "published",
+			'language' => 'en_US',
+			'meta_title' => substr($node->title, 0, 150),
+			'meta_description' => substr($node->title, 0, 150),
+			'author_id' => 1,
+			'created_at' => $node->created * 1000,
+			'created_by' => 1,
+			'updated_at' => $node->changed * 1000,
+			'updated_by' => 1,
+			'published_at' => $node->created * 1000,
+			'published_by' => 1
+		);
+
+		$exports[] = $item;
+	}
+
+	return $exports;
+}
+
+function ghost_export_post_tags($content_type) {
+	$exports = array();
+	$nodes = node_load_multiple(array(), array("type" => check_plain($content_type)));
+	foreach($nodes as $node) {
+		$tags = $node->field_tags["und"];
+		foreach($tags as $tag) {
+			if(isset($tag["tid"]) && !empty($tag["tid"])) {
+				$relationship = array(
+					'tag_id' => intval($tag["tid"]),
+					'post_id' => intval($node->nid)
+				);
+				
+				$exports[] = $relationship;
+			}
+		}
+
+	}
+
+	return $exports;
+}
+
+function ghost_export_roles_users() {
+	return array(
+		array("user_id" => 1, "role_id" => 3)
+	);
+}

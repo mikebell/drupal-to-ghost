@@ -1,0 +1,4 @@
+name = Ghost Export
+description = Export your content to Ghost
+core = 7.x
+package = ghost
