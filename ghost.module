@@ -69,10 +69,10 @@ function ghost_export_page_submit(&$form, &$form_state) {
     ),
   );
 
-  $filedir = 'sites/default/files';
+  $filedir = conf_path();
   $filename = "export_" . time() . ".json";
   $content = drupal_json_encode($export);
-  $handle = fopen($filedir . '/' . $filename, 'w');
+  $handle = fopen($filedir . '/files/' . $filename, 'w');
   fwrite($handle, $content);
   fclose($handle);
 
