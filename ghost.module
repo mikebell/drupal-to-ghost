@@ -76,17 +76,17 @@ function ghost_export_page_submit(&$form, &$form_state) {
   fwrite($handle, $content);
   fclose($handle);
 
-  header('Content-Description: File Transfer');
-  header('Content-Type: application/octet-stream');
-  header('Content-Disposition: attachment; filename=' . $filename);
-  header('Content-Transfer-Encoding: binary');
-  header('Expires: 0');
-  header('Cache-Control: must-revalidate');
-  header('Pragma: public');
-  header('Content-Length: ' . filesize($filedir . '/' . $filename));
+//  header('Content-Description: File Transfer');
+//  header('Content-Type: application/octet-stream');
+//  header('Content-Disposition: attachment; filename=' . $filename);
+//  header('Content-Transfer-Encoding: binary');
+//  header('Expires: 0');
+//  header('Cache-Control: must-revalidate');
+//  header('Pragma: public');
+//  header('Content-Length: ' . filesize($filedir . '/' . $filename));
 
   flush();
-  readfile($filedir . '/' . $filename);
+//  readfile($filedir . '/' . $filename);
   exit;
 }
 
@@ -159,8 +159,8 @@ function ghost_export_nodes($content_type) {
       "id" => intval($node->nid),
       "title" => substr($node->title, 0, 150),
       "slug" => substr(strtolower(str_replace(" ", "-", $node->title)), 0, 150),
-      "markdown" => isset($node->body["und"][0]["value"]) ? $node->body["und"][0]["value"] : $node->title,
-      "html" => isset($node->body["und"][0]["safe_value"]) ? str_replace("[", "<", str_replace("]", ">", $node->body["und"][0]["safe_value"])) : $node->title,
+      "markdown" => isset($node->body[$node->language][0]["value"]) ? $node->body[$node->language][0]["value"] : $node->title,
+      "html" => isset($node->body[$node->language][0]["safe_value"]) ? str_replace("[", "<", str_replace("]", ">", $node->body[$node->language][0]["safe_value"])) : $node->title,
       "image" => NULL,
       "featured" => 0,
       "page" => 0,
